@@ -1,0 +1,258 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier 
+from sklearn.metrics import confusion_matrix,classification_report
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn import tree
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import cross_val_score
+ins_file = r'/gdrive/My Drive/CIS 508/Fraud_detection/Train_ins.csv'
+ins_file2 = r'/gdrive/My Drive/CIS 508/Fraud_detection/Test_ins.csv'
+traindata = pd.read_csv(ins_file)
+testdata = pd.read_csv(ins_file2)
+traindata.isnull().sum()
+testdata.isnull().sum()
+traindata['FRAUDFOUND'].value_counts()
+testdata['FRAUDFOUND'].value_counts()
+traindata_copy = traindata.iloc[:,:-1]
+testdata_copy = testdata.iloc[:,:-1]
+categoricalFeature = ["MONTH","DAYOFWEEK","MAKE","ACCIDENTAREA","DAYOFWEEKCLAIMED","MONTHCLAIMED","SEX","MARITALSTATUS","FAULT","POLICYTYPE","VEHICLECATEGORY","VEHICLEPRICE","DAYS_POLICY_ACCIDENT","DAYS_POLICY_CLAIM","PASTNUMBEROFCLAIMS","AGEOFVEHICLE","AGEOFPOLICYHOLDER","POLICEREPORTFILED","WITNESSPRESENT","AGENTTYPE","NUMBEROFSUPPLIMENTS","ADDRESSCHANGE_CLAIM","NUMBEROFCARS","BASEPOLICY"]
+# Combine testdata and traindata for one hot encoding
+combined_data = pd.concat([traindata_copy,testdata_copy], keys=[0,1])
+# Do one hot encoding
+combined_data = pd.get_dummies(combined_data,columns=categoricalFeature)
+
+#Seperate Test and Target 
+x_train = combined_data.xs(0)
+x_test = combined_data.xs(1)
+x_train.head()
+
+# Seperate the target
+y_train = traindata["FRAUDFOUND"]
+y_test = testdata["FRAUDFOUND"]
+y_test.head()
+
+# Default Decison tree 
+clf = DecisionTreeClassifier()
+clf.fit(x_train,y_train)
+predict1=clf.predict(x_test)
+print(confusion_matrix(predict1,y_test))
+print("accuracy Score (training) for Decision Tree:{0:6f}".format(clf.score(x_test,y_test)))
+print("Parameters are",clf.get_params())
+print("Max Depth",clf.get_depth())
+print("No of Leaves",clf.get_n_leaves())
+print("classification report")
+print(classification_report(y_test,predict1))
+
+# Hyperparameter tunning for Decision tree
+print("Random search for deciosn tree")
+parameters={'min_samples_leaf' : range(1,150,5),'max_depth': range(1,150,8),'criterion':['gini','entropy']}
+clf_random = RandomizedSearchCV(clf,parameters,n_iter=30,cv=500)
+clf_random.fit(x_train,y_train)
+grid_param = clf_random.best_params_
+print(grid_param)
+
+# run the decision tree on the best parameters
+print(grid_param)
+clf = DecisionTreeClassifier(**grid_param)
+clf.fit(x_train,y_train)
+predict_randomsrch = clf.predict(x_test)
+print("accuracy report", clf.score(x_test,y_test))
+print("confusion matrix")
+print(confusion_matrix(predict_randomsrch,y_test))
+print("classification report")
+print(classification_report(predict_randomsrch,y_test))
+cv_score =cross_val_score(clf,x_train,y_train,cv=50,scoring="balanced_accuracy")
+print(cv_score)
+
+# Grid search for Decision Tree 
+from sklearn.model_selection import GridSearchCV
+print("Gridsearch_decision tree")
+clf_grid = GridSearchCV(clf,parameters,cv=15)
+clf_grid.fit(x_train,y_train)
+grid_pram1 = clf_grid.best_params_
+print(grid_pram1)
+
+#run the model with GRID BEST parameters
+clf= DecisionTreeClassifier(**grid_pram1)
+clf.fit(x_train,y_train)
+predict_gridsearch = clf.predict(x_test)
+print("accuracy report", clf.score(x_test,y_test))
+print("confusion matrix")
+print(confusion_matrix(predict_gridsearch,y_test))
+print("classification report")
+print(classification_report(predict_gridsearch,y_test))
+cv_score =cross_val_score(clf,x_train,y_train,cv=50,scoring="balanced_accuracy")
+print(cv_score)
+
+#Random forest approach
+print("Randomized Decision Tree")
+print('-------')
+
+rfc = RandomForestClassifier()
+rfc.fit(x_train,y_train)
+predict2 = rfc.predict(x_test)
+print("Confusion Matrix")
+print(confusion_matrix(predict2,y_test))
+print("accuracy Score (training) for Random Forest:{0:6f}".format(rfc.score(x_test,y_test)))
+print("Parameters are",rfc.get_params())
+print("classification report")
+print(classification_report(y_test,predict2))
+print("-"*100)
+
+#Random forest approach with hyperparameter tunning
+print("Hyperparameter Tunning with Random Forest apporach")
+rand_parameters={'min_samples_leaf': range(1,50,1),'max_depth': range(1,70,1),'max_features':[1,2,4,5,6],'n_estimators': range(10,300,50)}
+rfc_random = RandomizedSearchCV(rfc,rand_parameters,n_iter=30,cv=15)
+rfc_random.fit(x_train,y_train)
+
+rfc_param = rfc_random.best_params_
+print("Best Random Forest Random Search Parameters",rfc_param)
+#rfc_random.predict(x_test)
+
+# Use best random forest paramters to run the classifier
+rfc = RandomForestClassifier(**rfc_param)
+rfc.fit(x_train,y_train)
+pred_randomforest = rfc.predict(x_test)
+print("Accuracy score=",rfc.score(x_test,y_test))
+print("confusion matrix")
+print(confusion_matrix(pred_randomforest,y_test))
+print("Classification report",classification_report(y_test,pred_randomforest))
+
+# Random forest approach using Grid search
+from sklearn.model_selection import GridSearchCV
+rand_parameters={'min_samples_leaf': range(1,70,5),'max_depth': range(10,600,20),'max_features':[1,2,4,5],'n_estimators': range(10,300,60)}
+rfc_random = GridSearchCV(rfc,rand_parameters,cv=15)
+rfc_random.fit(x_train,y_train)
+grid_param_rfc = rfc_random.best_params_
+print(grid_param_rfc)
+
+rfc = RandomForestClassifier(**grid_param_rfc)
+rfc.fit(x_train,y_train)
+predict3 = rfc.predict(x_test)
+print("Accuracy score=",rfc.score(x_test,y_test))
+print("confusion matrix")
+print(confusion_matrix(predict3,y_test))
+print("Classification report",classification_report(y_test,predict3))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
